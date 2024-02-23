@@ -8,6 +8,7 @@ pub mod invariant_task {
 
     pub fn initialize(_ctx: Context<Initialize>) -> Result<()> {
         msg!("Installation Succeeded!");
+        msg!("test message");
         Ok(())
     }
 }
