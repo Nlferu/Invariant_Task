@@ -10,8 +10,12 @@ describe("invariant_task", () => {
 
     it("Is initialized!", async () => {
         const dataAccountKP = anchor.web3.Keypair.generate()
+        const user = anchor.web3.Keypair.generate()
 
         const tx = program.methods.initialize()
         console.log("Your transaction signature: ", tx)
+
+        const updateTx = program.methods.update(new anchor.BN(77)).accounts({ myAccount: dataAccountKP.publicKey })
+        console.log("Update Performed!", updateTx)
     })
 })
