@@ -54,11 +54,10 @@ pub mod invariant_task {
 
 #[account]
 pub struct MyAccount {
-    data: u64
+    pub data: u64
 }
 
 #[account]
-#[derive(Default)]
 pub struct GreetingAccount {
     pub name: String,
 }
@@ -69,6 +68,15 @@ pub struct Initialize<'info> {
     pub my_account: Account<'info, MyAccount>,
     #[account(mut)]
     pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Execute<'info> {
+    #[account(init, payer = user, space = 8 + 32)]
+    pub gm_account: Account<'info, GreetingAccount>,
+    #[account(mut)]
+    pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -89,8 +97,4 @@ pub struct Decrement<'info> {
     #[account(mut)]
     pub my_account: Account<'info, MyAccount>
 }
-#[derive(Accounts)]
-pub struct Execute<'info> {
-    #[account(mut)]
-    pub gm_account: Account<'info, GreetingAccount>,
-}
+
