@@ -22,28 +22,28 @@ describe("invariant_task", async () => {
             .rpc()
 
         const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Account Stored Data: ", storedAccountData.data)
+        console.log("Account Stored Data: ", storedAccountData.data.toNumber())
         assert.equal(storedAccountData.data.toNumber(), 0)
     })
     it("Updates account data correctly", async () => {
         await program.methods.update(new anchor.BN(77)).accounts({ myAccount: dataAccountKP.publicKey }).rpc()
 
         const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Account Stored Data: ", storedAccountData.data)
+        console.log("Updated Account Stored Data: ", storedAccountData.data.toNumber())
         assert.equal(storedAccountData.data.toNumber(), 77)
     })
     it("Increments data on account by 1 correctly", async () => {
         await program.methods.increment().accounts({ myAccount: dataAccountKP.publicKey }).rpc()
 
         const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Account Stored Data: ", storedAccountData.data)
+        console.log("Incremented Account Stored Data: ", storedAccountData.data.toNumber())
         assert.equal(storedAccountData.data.toNumber(), 78)
     })
     it("Decrements data on account by 1 correctly", async () => {
         await program.methods.decrement().accounts({ myAccount: dataAccountKP.publicKey }).rpc()
 
         const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Account Stored Data: ", storedAccountData.data)
+        console.log("Decremented Account Stored Data: ", storedAccountData.data.toNumber())
         assert.equal(storedAccountData.data.toNumber(), 77)
     })
     it("Executes welcome message correctly", async () => {
@@ -70,7 +70,7 @@ describe("invariant_task", async () => {
             .rpc()
 
         const storedName = await program.account.greetingAccount.fetch(gmAccount.publicKey)
-        console.log(storedName.name)
+        console.log("User Name Is: ", storedName.name)
 
         assert.equal(storedName.name, name)
     })
