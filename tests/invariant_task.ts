@@ -7,6 +7,24 @@ import { assert } from "chai"
 describe("invariant_task", async () => {
     // Configure the client to use the local cluster.
     anchor.setProvider(anchor.AnchorProvider.env())
+    const provider = anchor.AnchorProvider.env()
+    const devil = provider.wallet
+
+    const befDevil = await provider.connection.getBalance(devil.publicKey)
+    //await provider.connection.confirmTransaction(await provider.connection.requestAirdrop(devil.publicKey, 100000), "confirmed")
+
+    const airdropSignature = await provider.connection.requestAirdrop(devil.publicKey, 2777)
+
+    const latestBlockHash = await provider.connection.getLatestBlockhash()
+
+    await provider.connection.confirmTransaction({
+        blockhash: latestBlockHash.blockhash,
+        lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+        signature: airdropSignature,
+    })
+
+    const afBal = await provider.connection.getBalance(devil.publicKey)
+    console.log(`BEFORE BALAA: ${befDevil} AFTER ${afBal}`)
 
     const program = anchor.workspace.InvariantTask as Program<InvariantTask>
 
