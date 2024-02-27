@@ -2,6 +2,8 @@ import * as anchor from "@coral-xyz/anchor"
 import { Program } from "@coral-xyz/anchor"
 import { InvariantTask, IDL } from "../target/types/invariant_task"
 import "dotenv/config"
+
+/** @dev Added just for testing purposes if ts-node works */
 ;(async () => {
     anchor.setProvider(anchor.AnchorProvider.env())
 
@@ -11,7 +13,7 @@ import "dotenv/config"
     console.log(`Your transaction signature is: ${tx}`)
 })()
 
-/** @DEV Manual Connection */
+/** @dev Manual Connection */
 // import { Keypair, Connection } from "@solana/web3.js"
 // import fs from "fs"
 // import { IDL } from "../target/types/invariant_task"
