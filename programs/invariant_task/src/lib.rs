@@ -26,6 +26,13 @@ pub mod invariant_task {
         Ok(())
     }
 
+    pub fn execute(ctx: Context<Execute>, name: String) -> Result<()> {
+        let gm_account = &mut ctx.accounts.gm_account;
+        gm_account.name = name;
+        msg!("Hello, {}", gm_account.name);
+        Ok(())
+    }
+
     pub fn update(ctx: Context<Update>, data: u64) -> Result<()> {        
         let my_account = &mut ctx.accounts.my_account;
         my_account.data = data;
@@ -41,13 +48,6 @@ pub mod invariant_task {
     pub fn decrement(ctx: Context<Decrement>) -> Result<()> {        
         let my_account = &mut ctx.accounts.my_account;
         my_account.data -= 1;
-        Ok(())
-    }
-
-    pub fn execute(ctx: Context<Execute>, name: String) -> Result<()> {
-        let gm_account = &mut ctx.accounts.gm_account;
-        gm_account.name = name;
-        msg!("Hello, {}", gm_account.name);
         Ok(())
     }
 }
