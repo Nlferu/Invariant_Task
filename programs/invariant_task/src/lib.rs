@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("H3MzbSxhjW7uoW1Bqae4iNmq743KN3SjSHwcRPDdxsAq");
+declare_id!("FH5mcTB7dWgiNjs2JFNRXzyMk587oX7RrZTWtVbPPmFC");
 
 /** @TODO:
     ● Escrow contracts should maintain separate accounts for each user, allowing efficient handling of multiple users simultaneously
@@ -43,11 +43,24 @@ pub mod invariant_task {
         my_account.data -= 1;
         Ok(())
     }
+
+    pub fn execute(ctx: Context<Execute>, name: String) -> Result<()> {
+        let gm_account = &mut ctx.accounts.gm_account;
+        gm_account.name = name;
+        msg!("Hello, {}", gm_account.name);
+        Ok(())
+    }
 }
 
 #[account]
 pub struct MyAccount {
     data: u64
+}
+
+#[account]
+#[derive(Default)]
+pub struct GreetingAccount {
+    pub name: String,
 }
 
 #[derive(Accounts)]
@@ -75,4 +88,9 @@ pub struct Increment<'info> {
 pub struct Decrement<'info> {
     #[account(mut)]
     pub my_account: Account<'info, MyAccount>
+}
+#[derive(Accounts)]
+pub struct Execute<'info> {
+    #[account(mut)]
+    pub gm_account: Account<'info, GreetingAccount>,
 }
