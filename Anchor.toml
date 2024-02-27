@@ -5,7 +5,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-invariant_task = "H3MzbSxhjW7uoW1Bqae4iNmq743KN3SjSHwcRPDdxsAq"
+invariant_task = "FH5mcTB7dWgiNjs2JFNRXzyMk587oX7RrZTWtVbPPmFC"
 
 [registry]
 url = "https://api.apr.dev"
