@@ -52,8 +52,11 @@ pub struct MyAccount {
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
+    #[account(init, payer = signer, space = 8 + 8)]
+    pub my_account: Account<'info, MyAccount>,
     #[account(mut)]
-    pub my_account: Account<'info, MyAccount>
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
