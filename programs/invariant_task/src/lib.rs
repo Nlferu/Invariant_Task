@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token;
-use anchor_spl::token::{MintTo, Token, Transfer};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
-declare_id!("EMjE3UTNgvN79M5utukj1Q6UJqpFYinF7AxCV1oAY3gZ");
+declare_id!("GcTaCXUPXxLbaoTuFtzv3xg6wL7VB4Xq1WsjADwdDPJQ");
 
 /** @TODO:
    ● Escrow contracts should maintain separate accounts for each user, allowing efficient handling of multiple users simultaneously
@@ -21,84 +20,192 @@ declare_id!("EMjE3UTNgvN79M5utukj1Q6UJqpFYinF7AxCV1oAY3gZ");
 pub mod invariant_task {
     use super::*;
 
-    pub fn mint_token_a(ctx: Context<MintToken>) -> Result<()> {
-        // Create the MintTo struct for our context
-        let cpi_accounts = MintTo {
-            mint: ctx.accounts.mint.to_account_info(),
-            to: ctx.accounts.token_account.to_account_info(),
-            authority: ctx.accounts.authority.to_account_info(),
-        };
+    // This function is creating new escrow (selling x_token for y_token)
+    pub fn initialize(ctx: Context<Initialize>, x_amount: u64, y_amount: u64) -> Result<()> {
+        // This line retrieves a value associated with the key "escrow" from a map called bumps in the context ctx
+        // Unwraps the Option to get the actual value, and assigns it to the bump field of the escrow variable.
+        let escrow = &mut ctx.accounts.escrow;
+        escrow.bump = ctx.bumps.escrow;
+        // Our signer
+        escrow.authority = ctx.accounts.seller.key();
+        // It retrieves publicKey for escrowed_x_tokens acc and assigns it to escrowed_x_tokens variable
+        escrow.escrowed_x_tokens = ctx.accounts.escrowed_x_tokens.key();
+        // Number of token sellers wants in exchange
+        escrow.y_amount = y_amount;
+        // Token seller wants in exchange
+        escrow.y_mint = ctx.accounts.y_mint.key();
 
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        // Create the CpiContext we need for the request
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
-        // Execute anchor's helper function to mint tokens
-        token::mint_to(cpi_ctx, 10)?;
-
+        // Transfer seller's x_token in program owned escrow token account to initialize whole process
+        anchor_spl::token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.seller_x_token.to_account_info(),
+                    to: ctx.accounts.escrowed_x_tokens.to_account_info(),
+                    authority: ctx.accounts.seller.to_account_info(),
+                },
+            ),
+            x_amount,
+        )?;
         Ok(())
     }
 
-    pub fn mint_token_b(ctx: Context<MintToken>) -> Result<()> {
-        // Create the MintTo struct for our context
-        let cpi_accounts = MintTo {
-            mint: ctx.accounts.mint.to_account_info(),
-            to: ctx.accounts.token_account.to_account_info(),
-            authority: ctx.accounts.authority.to_account_info(),
-        };
-
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        // Create the CpiContext we need for the request
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
-        // Execute anchor's helper function to mint tokens
-        token::mint_to(cpi_ctx, 10)?;
-
+    // This function allows buyer to exchange y_token for x_token from open escrow
+    pub fn exchange(ctx: Context<Exchange>) -> Result<()> {
+        // transfer escrowd_x_token to buyer
+        anchor_spl::token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.escrowed_x_tokens.to_account_info(),
+                    to: ctx.accounts.buyer_x_tokens.to_account_info(),
+                    authority: ctx.accounts.escrow.to_account_info(),
+                },
+                &[&["escrow".as_bytes(), ctx.accounts.escrow.authority.as_ref(), &[ctx.accounts.escrow.bump]]],
+            ),
+            ctx.accounts.escrowed_x_tokens.amount,
+        )?;
+    
+    
+        // Transfer buyer's y_token to seller
+        anchor_spl::token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.buyer_y_tokens.to_account_info(),
+                    to: ctx.accounts.sellers_y_tokens.to_account_info(),
+                    authority: ctx.accounts.buyer.to_account_info(),
+                },
+            ),
+            ctx.accounts.escrow.y_amount,
+        )?;
         Ok(())
     }
-
-    pub fn transfer_token(ctx: Context<TransferToken>) -> Result<()> {
-        // Create the Transfer struct for our context
-        let transfer_instruction = Transfer {
-            from: ctx.accounts.from.to_account_info(),
-            to: ctx.accounts.to.to_account_info(),
-            authority: ctx.accounts.from_authority.to_account_info(),
-        };
-
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        // Create the Context for our Transfer request
-        let cpi_ctx = CpiContext::new(cpi_program, transfer_instruction);
-
-        // Execute anchor's helper function to transfer tokens
-        anchor_spl::token::transfer(cpi_ctx, 5)?;
-
+    
+    pub fn cancel(ctx: Context<Cancel>) -> Result<()> {
+        // Return seller's x_token back
+        anchor_spl::token::transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.escrowed_x_tokens.to_account_info(),
+                    to: ctx.accounts.seller_x_token.to_account_info(),
+                    authority: ctx.accounts.escrow.to_account_info(),
+                },
+                &[&["escrow6".as_bytes(), ctx.accounts.seller.key().as_ref(), &[ctx.accounts.escrow.bump]]],
+            ),
+            ctx.accounts.escrowed_x_tokens.amount,
+        )?;
+    
+        // Close account
+        anchor_spl::token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            anchor_spl::token::CloseAccount {
+                account: ctx.accounts.escrowed_x_tokens.to_account_info(),
+                destination: ctx.accounts.seller.to_account_info(),
+                authority: ctx.accounts.escrow.to_account_info(),
+            },
+            &[&["escrow6".as_bytes(), ctx.accounts.seller.key().as_ref(), &[ctx.accounts.escrow.bump]]],
+        ))?;
+    
         Ok(())
     }
 }
 
 #[derive(Accounts)]
-pub struct MintToken<'info> {
-    /// CHECK: This is the token that we want to mint
+pub struct Initialize<'info> {
+    // Seller willing to sell his token_x for token_y
     #[account(mut)]
-    pub mint: UncheckedAccount<'info>,
-    pub token_program: Program<'info, Token>,
-    /// CHECK: This is the token account that we want to mint tokens to
-    #[account(mut)]
-    pub token_account: UncheckedAccount<'info>,
-    /// CHECK: the authority of the mint account can allow us to mint tokens to our account
-    #[account(mut)]
-    pub authority: AccountInfo<'info>,
+    seller: Signer<'info>,
+
+    // Token x mint for ex. USDC
+    x_mint: Account<'info, Mint>,
+    // Token y mint 
+    y_mint: Account<'info, Mint>,
+
+    // ATA of x_mint 
+    #[account(mut, constraint = seller_x_token.mint == x_mint.key() && seller_x_token.owner == seller.key())] 
+    seller_x_token: Account<'info, TokenAccount>,
+
+    #[account(
+        init, 
+        payer = seller,  
+        space=Escrow::INIT_SPACE,
+        seeds = ["escrow6".as_bytes(), seller.key().as_ref()],
+        bump,
+    )]
+    pub escrow: Account<'info, Escrow>,
+
+    #[account(
+        init,
+        payer = seller,
+        token::mint = x_mint,
+        token::authority = escrow,
+    )]
+    escrowed_x_tokens: Account<'info, TokenAccount>,
+
+    token_program: Program<'info, Token>,
+    rent: Sysvar<'info, Rent>,
+    system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct TransferToken<'info> {
+pub struct Exchange<'info> {
+    pub buyer: Signer<'info>,
+
+    #[account(mut, seeds = ["escrow".as_bytes(), escrow.authority.as_ref()], bump = escrow.bump,)]
+    pub escrow: Account<'info, Escrow>,
+
+    #[account(mut, constraint = escrowed_x_tokens.key() == escrow.escrowed_x_tokens)]
+    pub escrowed_x_tokens: Account<'info, TokenAccount>,
+
+    #[account(mut, constraint = sellers_y_tokens.mint == escrow.y_mint)]
+    pub sellers_y_tokens: Account<'info, TokenAccount>,
+
+    #[account(mut, constraint = buyer_x_tokens.mint == escrowed_x_tokens.mint)]
+    pub buyer_x_tokens: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        constraint = buyer_y_tokens.mint == escrow.y_mint,
+        constraint = buyer_y_tokens.owner == buyer.key()
+    )]
+    pub buyer_y_tokens: Account<'info, TokenAccount>,
+
     pub token_program: Program<'info, Token>,
-    /// CHECK: The associated token account that we are transferring the token from
-    #[account(mut)]
-    pub from: UncheckedAccount<'info>,
-    /// CHECK: The associated token account that we are transferring the token to
-    #[account(mut)]
-    pub to: AccountInfo<'info>,
-    // the authority of the from account can allow us to mint tokens to our account
-    pub from_authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct Cancel<'info> {
+    pub seller: Signer<'info>,
+    #[account(
+        mut,
+        close = seller, constraint = escrow.authority == seller.key(),
+        seeds = ["escrow".as_bytes(), escrow.authority.as_ref()],
+        bump = escrow.bump,
+    )]
+    pub escrow: Account<'info, Escrow>,
+    #[account(mut, constraint = escrowed_x_tokens.key() == escrow.escrowed_x_tokens)]
+    pub escrowed_x_tokens: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = seller_x_token.mint == escrowed_x_tokens.mint,
+        constraint = seller_x_token.owner == seller.key()
+    )]
+    seller_x_token: Account<'info, TokenAccount>,
+    token_program: Program<'info, Token>,
+}
+
+#[account]
+pub struct Escrow {
+    authority: Pubkey,
+    bump: u8,
+    escrowed_x_tokens: Pubkey,
+    y_mint: Pubkey,
+    y_amount: u64,
+}
+
+
+impl Escrow {
+    pub const INIT_SPACE: usize = 8 + 1+ 32 + 32 + 32 + 8;
 }
