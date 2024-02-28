@@ -1,107 +1,146 @@
 import * as anchor from "@coral-xyz/anchor"
+import * as splToken from "@solana/spl-token"
 import { Program } from "@coral-xyz/anchor"
 import { InvariantTask } from "../target/types/invariant_task"
-import {
-    TOKEN_PROGRAM_ID,
-    MINT_SIZE,
-    createAssociatedTokenAccountInstruction,
-    getAssociatedTokenAddress,
-    createInitializeMintInstruction,
-} from "@solana/spl-token"
+import { LAMPORTS_PER_SOL, SYSVAR_RENT_PUBKEY } from "@solana/web3.js"
 import { assert } from "chai"
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet"
+import { Keypair } from "@solana/web3.js"
 
-describe("token-contract", () => {
-    // Configure the client to use the local cluster.
-    anchor.setProvider(anchor.AnchorProvider.env())
-    // Retrieve the InvariantTask struct from our smart contract
+describe("invariant_task", () => {
+    const provider = anchor.AnchorProvider.env()
+    anchor.setProvider(provider)
+
     const program = anchor.workspace.InvariantTask as Program<InvariantTask>
-    // Generate a random keypair that will represent our token
-    const mintKey: anchor.web3.Keypair = anchor.web3.Keypair.generate()
-    // AssociatedTokenAccount for anchor's workspace wallet
-    let associatedTokenAccount = undefined
 
-    it("Mint a token", async () => {
-        // Get anchor's wallet's public key
-        const key = anchor.AnchorProvider.env().wallet.publicKey
+    const seller = provider.wallet.publicKey
+    console.log(`Seller: `, seller.toString())
+    const payer = (provider.wallet as NodeWallet).payer
+    console.log(`Payer: `, payer.publicKey.toString())
+
+    const buyer = anchor.web3.Keypair.generate()
+    console.log(`Buyer: `, buyer.publicKey.toString())
+
+    const escrowedXTokens = anchor.web3.Keypair.generate()
+    console.log(`escrowedXTokens: `, escrowedXTokens.publicKey.toString())
+
+    let x_mint = undefined
+    let y_mint = undefined
+    let sellers_x_token = undefined
+    let sellers_y_token = undefined
+    let buyer_x_token = undefined
+    let buyer_y_token = undefined
+    let escrow: anchor.web3.PublicKey
+
+    before(async () => {
+        await provider.connection.requestAirdrop(buyer.publicKey, 1 * LAMPORTS_PER_SOL)
+        ;[escrow] = anchor.web3.PublicKey.findProgramAddressSync([anchor.utils.bytes.utf8.encode("escrow6"), seller.toBuffer()], program.programId)
         // Get the amount of SOL needed to pay rent for our Token Mint
-        const lamports: number = await program.provider.connection.getMinimumBalanceForRentExemption(MINT_SIZE)
+        const lamports: number = await program.provider.connection.getMinimumBalanceForRentExemption(splToken.MINT_SIZE)
 
-        // Get the ATA for a token and the account that we want to own the ATA (but it might not existing on the SOL network yet)
-        associatedTokenAccount = await getAssociatedTokenAddress(mintKey.publicKey, key)
+        x_mint = await splToken.createMint(provider.connection, payer, provider.wallet.publicKey, provider.wallet.publicKey, 6)
+        console.log(`x_mint: `, x_mint.toString())
 
-        // Fires a list of instructions
-        const mint_tx = new anchor.web3.Transaction().add(
-            // Use anchor to create an account from the mint key that we created
-            anchor.web3.SystemProgram.createAccount({
-                fromPubkey: key,
-                newAccountPubkey: mintKey.publicKey,
-                space: MINT_SIZE,
-                programId: TOKEN_PROGRAM_ID,
-                lamports,
-            }),
-            // Fire a transaction to create our mint account that is controlled by our anchor wallet
-            createInitializeMintInstruction(mintKey.publicKey, 0, key, key),
-            // Create the ATA account that is associated with our mint on our anchor wallet
-            createAssociatedTokenAccountInstruction(key, associatedTokenAccount, key, mintKey.publicKey)
-        )
+        y_mint = await splToken.createMint(provider.connection, payer, provider.wallet.publicKey, null, 6)
+        console.log(`y_mint: `, y_mint.toString())
 
-        // sends and create the transaction
-        const res = await anchor.AnchorProvider.env().sendAndConfirm(mint_tx, [mintKey])
+        // Seller x and y token account
+        // sellers_x_token = anchor.web3.SystemProgram.createAccount({
+        //     fromPubkey: x_mint,
+        //     newAccountPubkey: seller,
+        //     space: splToken.MINT_SIZE,
+        //     programId: splToken.TOKEN_PROGRAM_ID,
+        //     lamports,
+        // })
+        // console.log(`sellers_x_token: `, sellers_x_token.toString())
 
-        console.log(await program.provider.connection.getParsedAccountInfo(mintKey.publicKey))
+        // //await x_mint.splToken.mintTo(sellers_x_token, payer, [], 10_000_000_000)
 
-        console.log("Account: ", res)
-        console.log("Mint key: ", mintKey.publicKey.toString())
-        console.log("User: ", key.toString())
+        // sellers_y_token = await y_mint.createAccount(
+        //     anchor.web3.SystemProgram.createAccount({
+        //         fromPubkey: y_mint,
+        //         newAccountPubkey: seller,
+        //         space: splToken.MINT_SIZE,
+        //         programId: splToken.TOKEN_PROGRAM_ID,
+        //         lamports,
+        //     })
+        // )
+        // console.log(`sellers_y_token: `, sellers_y_token.toString())
 
-        // Executes our code to mint our token into our specified ATA
-        await program.methods
-            .mintToken()
-            .accounts({
-                mint: mintKey.publicKey,
-                tokenProgram: TOKEN_PROGRAM_ID,
-                tokenAccount: associatedTokenAccount,
-                authority: key,
-            })
-            .rpc()
+        // Buyer x and y token account
+        // buyer_x_token = await x_mint.createAccount(
+        //     anchor.web3.SystemProgram.createAccount({
+        //         fromPubkey: x_mint,
+        //         newAccountPubkey: buyer.publicKey,
+        //         space: splToken.MINT_SIZE,
+        //         programId: splToken.TOKEN_PROGRAM_ID,
+        //         lamports,
+        //     })
+        // )
+        // console.log(`buyer_x_token: `, buyer_x_token.toString())
 
-        // Get minted token amount on the ATA for our anchor wallet
-        // @ts-ignore
-        const minted = (await program.provider.connection.getParsedAccountInfo(associatedTokenAccount)).value.data.parsed.info.tokenAmount.amount
-        assert.equal(minted, 10)
+        // buyer_y_token = await y_mint.createAccount(
+        //     anchor.web3.SystemProgram.createAccount({
+        //         fromPubkey: y_mint,
+        //         newAccountPubkey: buyer.publicKey,
+        //         space: splToken.MINT_SIZE,
+        //         programId: splToken.TOKEN_PROGRAM_ID,
+        //         lamports,
+        //     })
+        // )
+        // console.log(`buyer_y_token: `, buyer_y_token.toString())
+
+        //await y_mint.mintTo(buyer_y_token, payer, [], 10_000_000_000)
     })
 
-    it("Transfer token", async () => {
-        // Get anchor's wallet's public key
-        const myWallet = anchor.AnchorProvider.env().wallet.publicKey
-        // Wallet that will receive the token
-        const toWallet: anchor.web3.Keypair = anchor.web3.Keypair.generate()
-        // The ATA for a token on the to wallet (but might not exist yet)
-        const toATA = await getAssociatedTokenAddress(mintKey.publicKey, toWallet.publicKey)
+    it("Initialize escrow", async () => {
+        // const x_amount = new anchor.BN(40)
+        // const y_amount = new anchor.BN(40)
+        // console.log("sellers_x_token: ", sellers_x_token)
+        // const tx = await program.methods
+        //     .initialize(x_amount, y_amount)
+        //     .accounts({
+        //         seller: seller,
+        //         xMint: x_mint,
+        //         yMint: y_mint,
+        //         sellerXToken: sellers_x_token,
+        //         escrow: escrow,
+        //         escrowedXTokens: escrowedXTokens.publicKey,
+        //         tokenProgram: splToken.TOKEN_PROGRAM_ID,
+        //         rent: SYSVAR_RENT_PUBKEY,
+        //         systemProgram: anchor.web3.SystemProgram.programId,
+        //     })
+        //     .signers([escrowedXTokens])
+        //     .rpc({ skipPreflight: true })
+        // console.log("TxSig :: ", tx)
+    })
 
-        // Fires a list of instructions
-        const mint_tx = new anchor.web3.Transaction().add(
-            // Create the ATA account that is associated with our To wallet
-            createAssociatedTokenAccountInstruction(myWallet, toATA, toWallet.publicKey, mintKey.publicKey)
-        )
+    it("Exchange", async () => {
+        // const tx = await program.methods
+        //     .exchange()
+        //     .accounts({
+        //         buyer: buyer.publicKey,
+        //         escrow: escrow,
+        //         escrowedXTokens: escrowedXTokens.publicKey,
+        //         sellersYTokens: sellers_y_token,
+        //         buyerXTokens: buyer_x_token,
+        //         buyerYTokens: buyer_y_token,
+        //         tokenProgram: splToken.TOKEN_PROGRAM_ID,
+        //     })
+        //     .signers([buyer])
+        //     .rpc({ skipPreflight: true })
+    })
 
-        // Sends and create the transaction
-        await anchor.AnchorProvider.env().sendAndConfirm(mint_tx, [])
-
-        // Executes our transfer smart contract
-        await program.methods
-            .transferToken()
-            .accounts({
-                tokenProgram: TOKEN_PROGRAM_ID,
-                from: associatedTokenAccount,
-                fromAuthority: myWallet,
-                to: toATA,
-            })
-            .rpc()
-
-        // Get minted token amount on the ATA for our anchor wallet
-        // @ts-ignore
-        const minted = (await program.provider.connection.getParsedAccountInfo(associatedTokenAccount)).value.data.parsed.info.tokenAmount.amount
-        assert.equal(minted, 5)
+    it("Cancel the trade", async () => {
+        // const tx = await program.methods
+        //     .cancel()
+        //     .accounts({
+        //         seller: seller,
+        //         escrow: escrow,
+        //         escrowedXTokens: escrowedXTokens.publicKey,
+        //         sellerXToken: sellers_x_token,
+        //         tokenProgram: splToken.TOKEN_PROGRAM_ID,
+        //     })
+        //     .rpc({ skipPreflight: true })
     })
 })
