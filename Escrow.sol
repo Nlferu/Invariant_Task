@@ -15,6 +15,7 @@ contract Escrow {
     uint256 public totalConfirmed = 0;
     uint256 public totalDisputed = 0;
 
+    // Using items instead of tokens
     mapping(uint256 => ItemStruct) private items;
     mapping(address => ItemStruct[]) private itemsOf;
     mapping(address => mapping(uint256 => bool)) public requested;
