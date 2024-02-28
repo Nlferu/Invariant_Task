@@ -36,14 +36,42 @@ Initializer can send a tx to the escrow program to setup the Vault. In this tx, 
 
 #### Initialize Structure:
 
--   Processor - Main buisiness logic locates in processor
--   Instructions (Account Context) - Instruction data packing/unpacking and account constraints and access control locate in Instruction handling part
--   Account - Declaration of account owned by program locates in account part
+-   initializer: `AccountInfo` - Signer of InitialEscrow instruction. To be stored in EscrowAccount
+-   initializer_deposit_token_account: `Account<TokenAccount>` - The account of token account for token exchange. To be stored in EscrowAccount
+-   initializer_receive_token_account: `Account<TokenAccount>` - The account of token account for token exchange. To be stored in EscrowAccount
+-   token_program: `AccountInfo` - The account of TokenProgram
+-   escrow_account: `Box<Account<EscrowAccount>>` - The account of EscrowAccount
+-   vault_account: `Account<TokenAccount>` - The account of Vault, which is created by Anchor via constraints.
+-   mint: `Account<Mint>`
+-   system_program: `AccountInfo`
+-   rent: `Sysvar<Rent>`
 
 ### Cancel
 
 Initializer can also send a tx to escrow program to cancel its demand. The tokens will be transfered back to the Initialzer and both Vault and EscrowAccount will be closed in this case.
 
+#### Cancel Structure:
+
+-   initializer `AccountInfo` The initializer of EscrowAccount
+-   initializer_deposit_token_account: `Account<TokenAccount>` - The address of token account for token exchange
+-   vault_account: `Account<TokenAccount>` The program derived address
+-   vault_authority: `AccountInfo` - The program derived address
+-   escrow_account: `Box<Account<EscrowAccount>>` - The address of EscrowAccount. Have to check if the EscrowAccount follows certain constraints.
+-   token_program: `AccountInfo` - The address of TokenProgram
+
 ### Exchange
 
 Taker can send a tx to the escrow to exchange Token B for Token A. First, tokens (Token B) will be transfered from Taker to Initializer. Afterward, the tokens (Token A) kept in the Vault will be transfered to Taker. Finally, both Vault and EscrowAccount will be closed.
+
+#### Exchange Structure:
+
+-   taker: `AccountInfo` - Singer of Exchange instruction
+-   taker_deposit_token_account: `Account<TokenAccount>` - Token account for token exchange
+-   taker_receive_token_account: `Account<TokenAccount>` - Token account for token exchange
+-   initializer_deposit_token_account: `Account<TokenAccount>` - Token account for token exchange
+-   initializer_receive_token_account: `Account<TokenAccount>` - Token account for token exchange
+-   initializer: `AccountInfo` - To be used in constraints. (Will explain in part 3)
+-   escrow_account: `Box<Account<EscrowAccount>>` - The address of EscrowAccount. Have to check if the EscrowAccount follows certain constraints.
+-   vault_account: `Account<TokenAccount>` - The program derived address
+-   vault_authority: `AccountInfo` - The program derived address
+-   token_program: `AccountInfo` - The address of TokenProgram
