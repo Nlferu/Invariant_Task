@@ -2,9 +2,9 @@ import * as anchor from "@coral-xyz/anchor"
 import * as splToken from "@solana/spl-token"
 import { Program } from "@coral-xyz/anchor"
 import { InvariantTask } from "../target/types/invariant_task"
-import { LAMPORTS_PER_SOL, SYSVAR_RENT_PUBKEY } from "@solana/web3.js"
-import { assert } from "chai"
+import { LAMPORTS_PER_SOL } from "@solana/web3.js"
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet"
+import { assert } from "chai"
 import { Keypair } from "@solana/web3.js"
 
 describe("invariant_task", () => {
@@ -43,104 +43,11 @@ describe("invariant_task", () => {
 
         y_mint = await splToken.createMint(provider.connection, payer, provider.wallet.publicKey, null, 6)
         console.log(`y_mint: `, y_mint.toString())
-
-        // Seller x and y token account
-        // sellers_x_token = anchor.web3.SystemProgram.createAccount({
-        //     fromPubkey: x_mint,
-        //     newAccountPubkey: seller,
-        //     space: splToken.MINT_SIZE,
-        //     programId: splToken.TOKEN_PROGRAM_ID,
-        //     lamports,
-        // })
-        // console.log(`sellers_x_token: `, sellers_x_token.toString())
-
-        // //await x_mint.splToken.mintTo(sellers_x_token, payer, [], 10_000_000_000)
-
-        // sellers_y_token = await y_mint.createAccount(
-        //     anchor.web3.SystemProgram.createAccount({
-        //         fromPubkey: y_mint,
-        //         newAccountPubkey: seller,
-        //         space: splToken.MINT_SIZE,
-        //         programId: splToken.TOKEN_PROGRAM_ID,
-        //         lamports,
-        //     })
-        // )
-        // console.log(`sellers_y_token: `, sellers_y_token.toString())
-
-        // Buyer x and y token account
-        // buyer_x_token = await x_mint.createAccount(
-        //     anchor.web3.SystemProgram.createAccount({
-        //         fromPubkey: x_mint,
-        //         newAccountPubkey: buyer.publicKey,
-        //         space: splToken.MINT_SIZE,
-        //         programId: splToken.TOKEN_PROGRAM_ID,
-        //         lamports,
-        //     })
-        // )
-        // console.log(`buyer_x_token: `, buyer_x_token.toString())
-
-        // buyer_y_token = await y_mint.createAccount(
-        //     anchor.web3.SystemProgram.createAccount({
-        //         fromPubkey: y_mint,
-        //         newAccountPubkey: buyer.publicKey,
-        //         space: splToken.MINT_SIZE,
-        //         programId: splToken.TOKEN_PROGRAM_ID,
-        //         lamports,
-        //     })
-        // )
-        // console.log(`buyer_y_token: `, buyer_y_token.toString())
-
-        //await y_mint.mintTo(buyer_y_token, payer, [], 10_000_000_000)
     })
 
-    it("Initialize escrow", async () => {
-        // const x_amount = new anchor.BN(40)
-        // const y_amount = new anchor.BN(40)
-        // console.log("sellers_x_token: ", sellers_x_token)
-        // const tx = await program.methods
-        //     .initialize(x_amount, y_amount)
-        //     .accounts({
-        //         seller: seller,
-        //         xMint: x_mint,
-        //         yMint: y_mint,
-        //         sellerXToken: sellers_x_token,
-        //         escrow: escrow,
-        //         escrowedXTokens: escrowedXTokens.publicKey,
-        //         tokenProgram: splToken.TOKEN_PROGRAM_ID,
-        //         rent: SYSVAR_RENT_PUBKEY,
-        //         systemProgram: anchor.web3.SystemProgram.programId,
-        //     })
-        //     .signers([escrowedXTokens])
-        //     .rpc({ skipPreflight: true })
-        // console.log("TxSig :: ", tx)
-    })
+    it("Initialize escrow", async () => {})
 
-    it("Exchange", async () => {
-        // const tx = await program.methods
-        //     .exchange()
-        //     .accounts({
-        //         buyer: buyer.publicKey,
-        //         escrow: escrow,
-        //         escrowedXTokens: escrowedXTokens.publicKey,
-        //         sellersYTokens: sellers_y_token,
-        //         buyerXTokens: buyer_x_token,
-        //         buyerYTokens: buyer_y_token,
-        //         tokenProgram: splToken.TOKEN_PROGRAM_ID,
-        //     })
-        //     .signers([buyer])
-        //     .rpc({ skipPreflight: true })
-    })
+    it("Exchange", async () => {})
 
-    it("Cancel the trade", async () => {
-        // const tx = await program.methods
-        //     .cancel()
-        //     .accounts({
-        //         seller: seller,
-        //         escrow: escrow,
-        //         escrowedXTokens: escrowedXTokens.publicKey,
-        //         sellerXToken: sellers_x_token,
-        //         tokenProgram: splToken.TOKEN_PROGRAM_ID,
-        //     })
-        //     .rpc({ skipPreflight: true })
-    })
+    it("Cancel the trade", async () => {})
 })
