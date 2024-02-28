@@ -1,77 +1,107 @@
 import * as anchor from "@coral-xyz/anchor"
 import { Program } from "@coral-xyz/anchor"
 import { InvariantTask } from "../target/types/invariant_task"
-import { Keypair } from "@solana/web3.js"
-import { assert, expect } from "chai"
+import {
+    TOKEN_PROGRAM_ID,
+    MINT_SIZE,
+    createAssociatedTokenAccountInstruction,
+    getAssociatedTokenAddress,
+    createInitializeMintInstruction,
+} from "@solana/spl-token"
+import { assert } from "chai"
 
-describe("invariant_task", async () => {
+describe("token-contract", () => {
     // Configure the client to use the local cluster.
-    const provider = anchor.AnchorProvider.env()
-    anchor.setProvider(provider)
-    const devil = provider.wallet
+    anchor.setProvider(anchor.AnchorProvider.env())
+    // Retrieve the InvariantTask struct from our smart contract
     const program = anchor.workspace.InvariantTask as Program<InvariantTask>
+    // Generate a random keypair that will represent our token
+    const mintKey: anchor.web3.Keypair = anchor.web3.Keypair.generate()
+    // AssociatedTokenAccount for anchor's workspace wallet
+    let associatedTokenAccount = undefined
 
-    // Creating new account
-    const dataAccountKP = anchor.web3.Keypair.generate()
+    it("Mint a token", async () => {
+        // Get anchor's wallet's public key
+        const key = anchor.AnchorProvider.env().wallet.publicKey
+        // Get the amount of SOL needed to pay rent for our Token Mint
+        const lamports: number = await program.provider.connection.getMinimumBalanceForRentExemption(MINT_SIZE)
 
-    it("Initializes contract and account correctly", async () => {
+        // Get the ATA for a token and the account that we want to own the ATA (but it might not existing on the SOL network yet)
+        associatedTokenAccount = await getAssociatedTokenAddress(mintKey.publicKey, key)
+
+        // Fires a list of instructions
+        const mint_tx = new anchor.web3.Transaction().add(
+            // Use anchor to create an account from the mint key that we created
+            anchor.web3.SystemProgram.createAccount({
+                fromPubkey: key,
+                newAccountPubkey: mintKey.publicKey,
+                space: MINT_SIZE,
+                programId: TOKEN_PROGRAM_ID,
+                lamports,
+            }),
+            // Fire a transaction to create our mint account that is controlled by our anchor wallet
+            createInitializeMintInstruction(mintKey.publicKey, 0, key, key),
+            // Create the ATA account that is associated with our mint on our anchor wallet
+            createAssociatedTokenAccountInstruction(key, associatedTokenAccount, key, mintKey.publicKey)
+        )
+
+        // sends and create the transaction
+        const res = await anchor.AnchorProvider.env().sendAndConfirm(mint_tx, [mintKey])
+
+        console.log(await program.provider.connection.getParsedAccountInfo(mintKey.publicKey))
+
+        console.log("Account: ", res)
+        console.log("Mint key: ", mintKey.publicKey.toString())
+        console.log("User: ", key.toString())
+
+        // Executes our code to mint our token into our specified ATA
         await program.methods
-            .initialize()
-            .accounts({ myAccount: dataAccountKP.publicKey, signer: devil.publicKey, systemProgram: anchor.web3.SystemProgram.programId })
-            .signers([dataAccountKP])
+            .mintToken()
+            .accounts({
+                mint: mintKey.publicKey,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                tokenAccount: associatedTokenAccount,
+                authority: key,
+            })
             .rpc()
 
-        const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Account Stored Data: ", storedAccountData.data.toNumber())
-        assert.equal(storedAccountData.data.toNumber(), 0)
+        // Get minted token amount on the ATA for our anchor wallet
+        // @ts-ignore
+        const minted = (await program.provider.connection.getParsedAccountInfo(associatedTokenAccount)).value.data.parsed.info.tokenAmount.amount
+        assert.equal(minted, 10)
     })
-    it("Updates account data correctly", async () => {
-        await program.methods.update(new anchor.BN(77)).accounts({ myAccount: dataAccountKP.publicKey }).rpc()
 
-        const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Updated Account Stored Data: ", storedAccountData.data.toNumber())
-        assert.equal(storedAccountData.data.toNumber(), 77)
-    })
-    it("Increments data on account by 1 correctly", async () => {
-        await program.methods.increment().accounts({ myAccount: dataAccountKP.publicKey }).rpc()
+    it("Transfer token", async () => {
+        // Get anchor's wallet's public key
+        const myWallet = anchor.AnchorProvider.env().wallet.publicKey
+        // Wallet that will receive the token
+        const toWallet: anchor.web3.Keypair = anchor.web3.Keypair.generate()
+        // The ATA for a token on the to wallet (but might not exist yet)
+        const toATA = await getAssociatedTokenAddress(mintKey.publicKey, toWallet.publicKey)
 
-        const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Incremented Account Stored Data: ", storedAccountData.data.toNumber())
-        assert.equal(storedAccountData.data.toNumber(), 78)
-    })
-    it("Decrements data on account by 1 correctly", async () => {
-        await program.methods.decrement().accounts({ myAccount: dataAccountKP.publicKey }).rpc()
+        // Fires a list of instructions
+        const mint_tx = new anchor.web3.Transaction().add(
+            // Create the ATA account that is associated with our To wallet
+            createAssociatedTokenAccountInstruction(myWallet, toATA, toWallet.publicKey, mintKey.publicKey)
+        )
 
-        const storedAccountData = await program.account.myAccount.fetch(dataAccountKP.publicKey)
-        console.log("Decremented Account Stored Data: ", storedAccountData.data.toNumber())
-        assert.equal(storedAccountData.data.toNumber(), 77)
-    })
-    it("Executes welcome message correctly", async () => {
-        // Example funding account
-        const prevDevilBalance = await provider.connection.getBalance(devil.publicKey)
-        const airdropSignature = await provider.connection.requestAirdrop(devil.publicKey, 2750)
-        const latestBlockHash = await provider.connection.getLatestBlockhash()
-        await provider.connection.confirmTransaction({
-            blockhash: latestBlockHash.blockhash,
-            lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
-            signature: airdropSignature,
-        })
+        // Sends and create the transaction
+        await anchor.AnchorProvider.env().sendAndConfirm(mint_tx, [])
 
-        const postDevilBalance = await provider.connection.getBalance(devil.publicKey)
-        console.log(`Starting Devil Balance: ${prevDevilBalance} Post Devil Balance: ${postDevilBalance}`)
-
-        const gmAccount = anchor.web3.Keypair.generate()
-        const name = "Anu"
-
+        // Executes our transfer smart contract
         await program.methods
-            .execute(name)
-            .accounts({ gmAccount: gmAccount.publicKey, user: devil.publicKey, systemProgram: anchor.web3.SystemProgram.programId })
-            .signers([gmAccount])
+            .transferToken()
+            .accounts({
+                tokenProgram: TOKEN_PROGRAM_ID,
+                from: associatedTokenAccount,
+                fromAuthority: myWallet,
+                to: toATA,
+            })
             .rpc()
 
-        const storedName = await program.account.greetingAccount.fetch(gmAccount.publicKey)
-        console.log("User Name Is: ", storedName.name)
-
-        assert.equal(storedName.name, name)
+        // Get minted token amount on the ATA for our anchor wallet
+        // @ts-ignore
+        const minted = (await program.provider.connection.getParsedAccountInfo(associatedTokenAccount)).value.data.parsed.info.tokenAmount.amount
+        assert.equal(minted, 5)
     })
 })
